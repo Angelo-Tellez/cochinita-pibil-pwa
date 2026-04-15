@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { auth } from "@/lib/firebase"
+import { auth, googleProvider } from "@/lib/firebase"
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -47,17 +48,28 @@ export function useAuth() {
     }
   }
 
+  const loginWithGoogle = async () => {
+    try {
+      const credential = await signInWithPopup(auth, googleProvider)
+      setUser(credential.user)
+      return { success: true, user: credential.user }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  }
+
   const logout = async () => {
     await signOut(auth)
     setUser(null)
   }
 
   return {
-    user,
-    isLoaded,
-    register,
-    login,
-    logout,
-    isAuthenticated: !!user,
-  }
+  user,
+  isLoaded,
+  register,
+  login,
+  loginWithGoogle,
+  logout,
+  isAuthenticated: !!user,
+}
 }
