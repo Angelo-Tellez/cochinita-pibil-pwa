@@ -7,10 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Trash2, Eye, Clock, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
-import { getAllOrders, type Order } from "@/lib/orders-service"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc, deleteDoc } from "firebase/firestore"
-
+import { getAllOrders, archiveOrder, type Order } from "@/lib/orders-service"
 type SortBy = "date" | "status" | "name"
 type FilterStatus = "all" | "pending" | "preparing" | "ready" | "completed"
 
@@ -60,15 +59,16 @@ export default function AdminPage() {
     }
   }
 
+
   const deleteOrder = async (orderId: string) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar este pedido?")) return
+    if (!confirm("¿Archivar este pedido? Seguirá visible en el historial del cliente.")) return
     try {
-      await deleteDoc(doc(db, "orders", orderId))
+      await archiveOrder(orderId)
       setOrders(orders.filter((o) => o.id !== orderId))
       setSelectedOrder(null)
     } catch (error) {
-      console.error("Error eliminando pedido:", error)
-      alert("Error al eliminar el pedido")
+      console.error("Error archivando pedido:", error)
+      alert("Error al archivar el pedido")
     }
   }
 
@@ -365,7 +365,7 @@ export default function AdminPage() {
                       onClick={() => deleteOrder(selectedOrder.id!)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar Pedido
+                      Archivar Pedido
                     </Button>
                   </CardContent>
                 </Card>

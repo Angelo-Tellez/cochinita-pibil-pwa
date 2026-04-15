@@ -1,7 +1,6 @@
 import { db } from "./firebase"
-import { collection, addDoc, getDocs, query, where, orderBy, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc } from "firebase/firestore"
 import type { CartItem } from "./cart-store"
-
 export interface Order {
   id?: string
   userId: string
@@ -19,6 +18,7 @@ export interface Order {
   specialInstructions: string
   status: "pending" | "preparing" | "ready" | "completed"
   createdAt?: any
+  archived?: boolean  // ← NUEVO
 }
 
 export async function saveOrder(order: Omit<Order, "id">): Promise<string> {
@@ -49,12 +49,21 @@ export async function getOrdersByUser(userId: string): Promise<Order[]> {
 
 export async function getAllOrders(): Promise<Order[]> {
   try {
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"))
+    const q = query(
+      collection(db, "orders"),
+      where("archived", "==", false),
+      orderBy("createdAt", "desc")
+    )
     const snapshot = await getDocs(q)
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
   } catch (error) {
     const snapshot = await getDocs(collection(db, "orders"))
     const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-    return orders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return orders
+      .filter((o) => !o.archived)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }
+}
+export async function archiveOrder(orderId: string): Promise<void> {
+  await updateDoc(doc(db, "orders", orderId), { archived: true })
 }
