@@ -6,29 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, CheckCircle, Copy, Clock } from "lucide-react"
 import Link from "next/link"
-
-interface OrderData {
-  id: string
-  date: string
-  customer: {
-    name: string
-    email: string
-    phone: string
-  }
-  items: Array<{
-    id: number
-    quantity: number
-    name: string
-    price: number
-    image: string
-  }>
-  subtotal: number
-  tax: number
-  total: number
-  pickupTime: string
-  specialInstructions: string
-  status: string
-}
+import { db } from "@/lib/firebase"
+import { doc, getDoc } from "firebase/firestore"
+import type { Order } from "@/lib/orders-service"
 
 export default function OrderConfirmationPage({
   params,
@@ -36,24 +16,41 @@ export default function OrderConfirmationPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-
-  const [order, setOrder] = useState<OrderData | null>(null)
+  const [order, setOrder] = useState<Order | null>(null)
   const [copied, setCopied] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem("cochinita-orders") || "[]")
-    const foundOrder = orders.find((o: OrderData) => o.id === id)
-    if (foundOrder) {
-      setOrder(foundOrder)
+    const fetchOrder = async () => {
+      try {
+        const docRef = doc(db, "orders", id)
+        const snapshot = await getDoc(docRef)
+        if (snapshot.exists()) {
+          setOrder({ id: snapshot.id, ...snapshot.data() } as Order)
+        }
+      } catch (error) {
+        console.error("Error cargando pedido:", error)
+      } finally {
+        setLoading(false)
+      }
     }
+    fetchOrder()
   }, [id])
 
   const copyOrderId = () => {
-    if (order) {
-      navigator.clipboard.writeText(order.id)
+    if (order?.id) {
+      navigator.clipboard.writeText(`#${order.id.slice(-6)}`)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Cargando pedido...</p>
+      </div>
+    )
   }
 
   if (!order) {
@@ -69,11 +66,13 @@ export default function OrderConfirmationPage({
             </Link>
           </div>
         </header>
-
         <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <Card className="text-center">
             <CardContent className="py-12">
-              <p className="text-muted-foreground">Cargando pedido...</p>
+              <p className="text-muted-foreground">No se encontró el pedido.</p>
+              <Link href="/">
+                <Button className="mt-4 bg-primary text-primary-foreground">Ir al Menú</Button>
+              </Link>
             </CardContent>
           </Card>
         </main>
@@ -81,11 +80,8 @@ export default function OrderConfirmationPage({
     )
   }
 
-  const pickupDate = new Date(new Date().getTime() + Math.random() * 120 * 60 * 1000)
-
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <header className="border-b border-border bg-card shadow-sm">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/">
@@ -97,9 +93,7 @@ export default function OrderConfirmationPage({
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Success Banner */}
         <Card className="mb-8 border-green-200 bg-green-50">
           <CardContent className="py-8 text-center">
             <div className="flex justify-center mb-4">
@@ -111,25 +105,24 @@ export default function OrderConfirmationPage({
         </Card>
 
         <div className="grid gap-8 lg:grid-cols-3">
-          {/* Order Details */}
           <div className="space-y-6 lg:col-span-2">
-            {/* Order Number */}
             <Card>
               <CardHeader>
                 <CardTitle>Número de Pedido</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-2">
-                  <code className="text-lg font-mono font-bold text-primary flex-1">{order.id}</code>
+                  <code className="text-lg font-mono font-bold text-primary flex-1">
+                    #{order.id?.slice(-6)}
+                  </code>
                   <Button size="sm" variant="outline" onClick={copyOrderId}>
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-4 w-4 mr-1" />
                     {copied ? "Copiado" : "Copiar"}
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Pickup Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -144,13 +137,12 @@ export default function OrderConfirmationPage({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Ubicación</p>
-                  <p className="text-lg font-semibold text-foreground">Cochinita Pibil Restaurant</p>
-                  <p className="text-sm text-muted-foreground mt-1">Calle Principal 123, Mérida, YL</p>
+                  <p className="text-lg font-semibold text-foreground">Porké — Comida Yucateca</p>
+                  <p className="text-sm text-muted-foreground mt-1">Metepec, Estado de México</p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Customer Information */}
             <Card>
               <CardHeader>
                 <CardTitle>Información del Cliente</CardTitle>
@@ -171,7 +163,6 @@ export default function OrderConfirmationPage({
               </CardContent>
             </Card>
 
-            {/* Order Items */}
             <Card>
               <CardHeader>
                 <CardTitle>Artículos del Pedido</CardTitle>
@@ -203,7 +194,6 @@ export default function OrderConfirmationPage({
             )}
           </div>
 
-          {/* Order Summary */}
           <div className="lg:col-span-1">
             <Card className="sticky top-4">
               <CardHeader>
@@ -220,12 +210,10 @@ export default function OrderConfirmationPage({
                     <span>${order.tax.toFixed(2)}</span>
                   </div>
                 </div>
-
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
                   <span className="text-primary">${order.total.toFixed(2)}</span>
                 </div>
-
                 <Link href="/">
                   <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
                     Volver al Menú
