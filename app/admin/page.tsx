@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/admin-service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Trash2, Eye, Clock, CheckCircle, AlertCircle } from "lucide-react"
+import { ArrowLeft, Trash2, Eye, Clock, CheckCircle, AlertCircle, Plus} from "lucide-react"
 import Link from "next/link"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc } from "firebase/firestore"
@@ -124,7 +124,7 @@ export default function AdminPage() {
           <CardContent className="py-12 text-center">
             <h2 className="text-2xl font-bold mb-4">Acceso Restringido</h2>
             <p className="text-muted-foreground mb-6">Debes iniciar sesión para acceder al panel.</p>
-            <Link href="/login">
+            <Link href="/login?redirect=/admin">
               <Button className="bg-primary text-primary-foreground">Iniciar Sesión</Button>
             </Link>
           </CardContent>
@@ -161,9 +161,17 @@ export default function AdminPage() {
               </Button>
             </Link>
             <h1 className="text-2xl font-bold text-primary">Panel de Administración</h1>
-            <Button variant="outline" onClick={() => logout()}>
-              Cerrar Sesión
-            </Button>
+            <div className="flex items-center gap-2">
+              <Link href="/admin/menu">
+                <Button variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Gestionar Menú
+                </Button>
+              </Link>
+              <Button variant="outline" onClick={() => logout()}>
+                Cerrar Sesión
+              </Button>
+            </div>
           </div>
         </div>
       </header>

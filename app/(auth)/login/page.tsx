@@ -1,66 +1,61 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
-  const { login, loginWithGoogle } = useAuth()
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  })
+  const searchParams = useSearchParams()
+  const { login, loginWithGoogle, user, isLoaded } = useAuth()
+  const [formData, setFormData] = useState({ email: "", password: "" })
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [shouldRedirect, setShouldRedirect] = useState(false)
+
+  useEffect(() => {
+    if (shouldRedirect && isLoaded && user) {
+      const redirectTo = searchParams.get("redirect") || "/"
+      router.push(redirectTo)
+    }
+  }, [shouldRedirect, isLoaded, user])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
-
-    if (!formData.email.trim()) {
-      setError("Por favor ingresa tu email")
-      return
-    }
-    if (!formData.password) {
-      setError("Por favor ingresa tu contraseña")
-      return
-    }
+    if (!formData.email.trim()) { setError("Por favor ingresa tu email"); return }
+    if (!formData.password) { setError("Por favor ingresa tu contraseña"); return }
 
     setIsLoading(true)
-    const result =await login(formData.email, formData.password)
-
+    const result = await login(formData.email, formData.password)
     if (result.success) {
-      router.push("/")
+      setShouldRedirect(true)
     } else {
-      setError(result.error)
+      setError(result.error || "Error al iniciar sesión")
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
+
   const handleGoogleLogin = async () => {
-  setIsLoading(true)
-  const result = await loginWithGoogle()
-  if (result.success) {
-    router.push("/")
-  } else {
-    setError(result.error || "Error al iniciar sesión con Google")
+    setIsLoading(true)
+    const result = await loginWithGoogle()
+    if (result.success) {
+      setShouldRedirect(true)
+    } else {
+      setError(result.error || "Error al iniciar sesión con Google")
+      setIsLoading(false)
+    }
   }
-  setIsLoading(false)
-}
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -73,7 +68,6 @@ export default function LoginPage() {
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">{error}</div>
             )}
-
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Email</label>
               <Input
@@ -84,7 +78,6 @@ export default function LoginPage() {
                 placeholder="tu@email.com"
               />
             </div>
-
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">Contraseña</label>
               <Input
@@ -95,7 +88,6 @@ export default function LoginPage() {
                 placeholder="••••••"
               />
             </div>
-
             <Button
               type="submit"
               disabled={isLoading}
@@ -128,6 +120,7 @@ export default function LoginPage() {
               </svg>
               Continuar con Google
             </Button>
+
             <p className="text-center text-sm text-muted-foreground">
               ¿No tienes cuenta?{" "}
               <Link href="/register" className="text-primary font-semibold hover:underline">
@@ -138,5 +131,17 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }

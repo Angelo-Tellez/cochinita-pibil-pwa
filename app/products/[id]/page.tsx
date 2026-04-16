@@ -1,22 +1,47 @@
 "use client"
 
-import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ArrowLeft, Plus, Minus, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { useCart } from "@/hooks/use-cart"
-import { MENU_ITEMS } from "@/lib/menu-data"
+import { getProductById, type Product } from "@/lib/products-service"
 import { Footer } from "@/components/footer"
 
 export default function ProductDetailPage() {
-  const router = useRouter()
   const params = useParams()
-  const productId = Number.parseInt(params.id as string)
-  const product = MENU_ITEMS.find((item) => item.id === productId)
+  const productId = params.id as string
   const { addToCart, cart } = useCart()
   const [quantity, setQuantity] = useState(1)
+  const [product, setProduct] = useState<Product | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getProductById(productId).then((data) => {
+      setProduct(data)
+      setLoading(false)
+    })
+  }, [productId])
+
+  const handleAddToCart = () => {
+    if (!product) return
+    for (let i = 0; i < quantity; i++) {
+      addToCart({ id: product.id, name: product.name, price: product.price, image: product.image })
+    }
+    setQuantity(1)
+  }
+
+  const existingItem = cart.find((c) => c.id === productId)
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Cargando producto...</p>
+      </div>
+    )
+  }
 
   if (!product) {
     return (
@@ -34,18 +59,8 @@ export default function ProductDetailPage() {
     )
   }
 
-  const handleAddToCart = () => {
-    for (let i = 0; i < quantity; i++) {
-      addToCart({ id: product.id, name: product.name, price: product.price, image: product.image })
-    }
-    setQuantity(1)
-  }
-
-  const existingItem = cart.find((c) => c.id === product.id)
-
   return (
     <div className="min-h-screen bg-background flex flex-col pb-20">
-      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border bg-card shadow-sm">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
@@ -60,35 +75,33 @@ export default function ProductDetailPage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="mx-auto max-w-4xl w-full px-4 py-8 sm:px-6 lg:px-8 flex-1">
         <div className="grid gap-8 md:grid-cols-2">
-          {/* Product Image */}
           <div className="flex items-center justify-center">
             <Card className="w-full overflow-hidden">
-              <img src={product.image || "/placeholder.svg"} alt={product.name} className="w-full h-96 object-cover" />
+              <img
+                src={product.image || "/placeholder.svg"}
+                alt={product.name}
+                className="w-full h-96 object-cover"
+              />
             </Card>
           </div>
 
-          {/* Product Info */}
           <div className="flex flex-col justify-between">
             <div>
               <h2 className="text-3xl font-bold text-foreground mb-2">{product.name}</h2>
               <p className="text-muted-foreground mb-6">{product.description}</p>
 
-              {/* Price */}
               <div className="mb-6 p-4 bg-accent/10 rounded-lg border border-accent/20">
                 <p className="text-sm text-muted-foreground mb-1">Precio</p>
                 <p className="text-3xl font-bold text-primary">${product.price.toFixed(2)}</p>
               </div>
 
-              {/* Product Details */}
               <div className="space-y-4 mb-6">
                 <div className="p-4 bg-card border border-border rounded-lg">
                   <p className="text-sm text-muted-foreground mb-1">Detalles del Producto</p>
                   <p className="text-foreground">{product.details}</p>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-card border border-border rounded-lg">
                     <p className="text-sm text-muted-foreground mb-1">Calorías</p>
@@ -99,7 +112,6 @@ export default function ProductDetailPage() {
                     <p className="text-lg font-semibold text-primary">{product.portion}</p>
                   </div>
                 </div>
-
                 <div className="p-4 bg-card border border-border rounded-lg">
                   <p className="text-sm text-muted-foreground mb-2">Ingredientes</p>
                   <p className="text-foreground">{product.ingredients}</p>
@@ -107,7 +119,6 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            {/* Add to Cart */}
             <div className="space-y-4 pt-6 border-t border-border">
               <div className="flex items-center gap-4">
                 <span className="text-muted-foreground">Cantidad:</span>
@@ -143,7 +154,6 @@ export default function ProductDetailPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <Footer />
     </div>
   )
