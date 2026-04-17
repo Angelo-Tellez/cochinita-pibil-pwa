@@ -17,8 +17,10 @@ export interface Order {
   pickupTime: string
   specialInstructions: string
   status: "pending" | "preparing" | "ready" | "completed"
+  paymentStatus?: "paid" | "pending" 
+  paymentId?: string                   
   createdAt?: any
-  archived?: boolean  // ← NUEVO
+  archived?: boolean  
 }
 
 export async function saveOrder(order: Omit<Order, "id">): Promise<string> {
