@@ -16,6 +16,7 @@ function RegisterForm() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone: "",
     password: "",
     confirmPassword: "",
   })
@@ -41,12 +42,14 @@ function RegisterForm() {
 
     if (!formData.name.trim()) { setError("Por favor ingresa tu nombre"); return }
     if (!formData.email.trim()) { setError("Por favor ingresa tu email"); return }
+    if (!formData.phone.trim()) { setError("Por favor ingresa tu teléfono"); return }
+    if (formData.password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres"); return }
     if (formData.password !== formData.confirmPassword) { setError("Las contraseñas no coinciden"); return }
 
     setIsLoading(true)
-    const result = await register(formData.email, formData.password, formData.name)
+    const result = await register(formData.email, formData.password, formData.name, formData.phone)
     if (result.success) {
-      setShouldRedirect(true)
+      router.push("/verify-email")  // ← redirige a verificación
     } else {
       setError(result.error || "Error al registrarse")
       setIsLoading(false)
@@ -103,6 +106,16 @@ function RegisterForm() {
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="••••••"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">Teléfono *</label>
+              <Input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleInputChange}
+                placeholder="+52 (555) 123-4567"
               />
             </div>
             <div>

@@ -12,6 +12,7 @@ import { ArrowLeft, Clock, User } from "lucide-react"
 import Link from "next/link"
 import { saveOrder } from "@/lib/orders-service"
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js"
+import { updateUserPhone } from "@/lib/users-service"
 
 const PICKUP_TIMES = ["15 minutos", "30 minutos", "45 minutos", "1 hora", "1 hora 30 min", "2 horas"]
 
@@ -145,6 +146,9 @@ export default function CheckoutPage() {
   const handlePaymentSuccess = async (paymentId: string) => {
     setIsSubmitting(true)
     try {
+      if (formData.phone) {
+        await updateUserPhone(user.uid, formData.phone)
+      }
       const orderId = await saveOrder({
         userId: user.uid,
         date: new Date().toISOString(),
