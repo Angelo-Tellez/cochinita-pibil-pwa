@@ -72,6 +72,15 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password)
+      
+      if (!credential.user.emailVerified) {
+        await signOut(auth)
+        return { 
+          success: false, 
+          error: "Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada." 
+        }
+      }
+
       setUser(credential.user)
       return { success: true, user: credential.user }
     } catch (error: any) {
