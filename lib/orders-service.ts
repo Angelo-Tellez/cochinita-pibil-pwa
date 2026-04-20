@@ -36,12 +36,11 @@ export async function getOrdersByUser(userId: string): Promise<Order[]> {
     const q = query(
       collection(db, "orders"),
       where("userId", "==", userId),
-      orderBy("createdAt", "desc")  // ← más reciente primero
+      orderBy("createdAt", "desc")
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+    return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })) as Order[]
   } catch (error) {
-    // Si no existe el índice aún, cae aquí sin romper la app
     const q = query(collection(db, "orders"), where("userId", "==", userId))
     const snapshot = await getDocs(q)
     const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
@@ -57,7 +56,7 @@ export async function getAllOrders(): Promise<Order[]> {
       orderBy("createdAt", "desc")
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+    return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })) as Order[]
   } catch (error) {
     const snapshot = await getDocs(collection(db, "orders"))
     const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]

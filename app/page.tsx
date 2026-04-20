@@ -12,12 +12,9 @@ export default function HomePage() {
   const { cart, addToCart, removeFromCart } = useCart()
   const { user, logout } = useAuth()
   const categories = ["Principales", "Sopas", "Acompañamientos", "Bebidas"]
-
-  // ← NUEVO: estado para los productos
   const [menuItems, setMenuItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
-  // ← NUEVO: cargar desde Firestore al montar
   useEffect(() => {
     getProducts().then((products) => {
       setMenuItems(products)
@@ -25,7 +22,6 @@ export default function HomePage() {
     })
   }, [])
 
-  // ← MODIFICADA: usa menuItems en lugar de MENU_ITEMS
   const productsByCategory = categories.reduce(
     (acc, category) => {
       acc[category] = menuItems.filter((item) => item.category === category)

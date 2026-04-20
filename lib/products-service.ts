@@ -18,12 +18,18 @@ export interface Product {
 export async function getProducts(): Promise<Product[]> {
   const q = query(collection(db, "products"), where("available", "==", true))
   const snapshot = await getDocs(q)
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Product[]
+  return snapshot.docs.map((d) => ({
+    ...d.data(),   // ← primero los datos
+    id: d.id,      // ← luego el ID de Firestore (sobreescribe el numérico)
+  })) as Product[]
 }
 
 export async function getAllProducts(): Promise<Product[]> {
   const snapshot = await getDocs(collection(db, "products"))
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Product[]
+  return snapshot.docs.map((d) => ({
+    ...d.data(),
+    id: d.id,      // ← mismo fix
+  })) as Product[]
 }
 
 export async function getProductById(id: string): Promise<Product | null> {

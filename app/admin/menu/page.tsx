@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { isAdmin } from "@/lib/admin-service"
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Plus, Pencil, Trash2, X, Check } from "lucide-react"
+import { uploadImageToCloudinary } from "@/lib/cloudinary-service"
 import Link from "next/link"
 
 const CATEGORIES = ["Principales", "Sopas", "Acompañamientos", "Bebidas"]
@@ -37,6 +39,9 @@ export default function AdminMenuPage() {
   const [formData, setFormData] = useState<Omit<Product, "id">>(emptyProduct)
   const [saving, setSaving] = useState(false)
   const [filterCategory, setFilterCategory] = useState("all")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>("")
+  const [uploadingImage, setUploadingImage] = useState(false)
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -57,6 +62,13 @@ export default function AdminMenuPage() {
     checkAdmin()
   }, [user, isLoaded])
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setFormData({
@@ -71,12 +83,16 @@ export default function AdminMenuPage() {
       details: product.details,
       available: product.available,
     })
+    setImagePreview("")
+    setImageFile(null)
     setShowForm(true)
   }
 
   const handleNew = () => {
     setEditingProduct(null)
     setFormData(emptyProduct)
+    setImageFile(null)
+    setImagePreview("")
     setShowForm(true)
   }
 
@@ -84,6 +100,8 @@ export default function AdminMenuPage() {
     setShowForm(false)
     setEditingProduct(null)
     setFormData(emptyProduct)
+    setImageFile(null)
+    setImagePreview("")
   }
 
   const handleSave = async () => {
@@ -93,12 +111,19 @@ export default function AdminMenuPage() {
     }
     setSaving(true)
     try {
+      let imageUrl = formData.image
+      if (imageFile) {
+        setUploadingImage(true)
+        imageUrl = await uploadImageToCloudinary(imageFile)
+        setUploadingImage(false)
+      }
+      const dataToSave = { ...formData, image: imageUrl }
       if (editingProduct) {
-        await updateProduct(editingProduct.id, formData)
-        setProducts(products.map((p) => p.id === editingProduct.id ? { ...formData, id: editingProduct.id } : p))
+        await updateProduct(editingProduct.id, dataToSave)
+        setProducts(products.map((p) => p.id === editingProduct.id ? { ...dataToSave, id: editingProduct.id } : p))
       } else {
-        const newId = await createProduct(formData)
-        setProducts([...products, { ...formData, id: newId }])
+        const newId = await createProduct(dataToSave)
+        setProducts([...products, { ...dataToSave, id: newId }])
       }
       handleCancel()
     } catch (error) {
@@ -106,6 +131,7 @@ export default function AdminMenuPage() {
       alert("Error al guardar el producto")
     } finally {
       setSaving(false)
+      setUploadingImage(false)
     }
   }
 
@@ -176,8 +202,6 @@ export default function AdminMenuPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-
-        {/* Formulario */}
         {showForm && (
           <Card className="mb-8 border-primary">
             <CardHeader>
@@ -232,14 +256,38 @@ export default function AdminMenuPage() {
                     placeholder="0"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">URL de imagen</label>
-                  <Input
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="/nombre-imagen.jpg"
-                  />
+
+                {/* ← NUEVO: campo de imagen con Cloudinary */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Imagen del platillo</label>
+                  {(imagePreview || formData.image) && (
+                    <div className="mb-2">
+                      <img
+                        src={imagePreview || formData.image}
+                        alt="Preview"
+                        className="h-32 w-32 object-cover rounded-lg border border-border"
+                      />
+                    </div>
+                  )}
+                  <label className="cursor-pointer">
+                    <div className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg bg-background hover:bg-muted w-fit">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-sm text-foreground">
+                        {imageFile ? imageFile.name : "Seleccionar imagen"}
+                      </span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-1">JPG, PNG o WebP. Máximo 5MB.</p>
                 </div>
+
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium mb-1">Descripción corta</label>
                   <Input
@@ -281,11 +329,11 @@ export default function AdminMenuPage() {
               <div className="flex gap-3 mt-6">
                 <Button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || uploadingImage}
                   className="gap-2 bg-primary text-primary-foreground"
                 >
                   <Check className="h-4 w-4" />
-                  {saving ? "Guardando..." : "Guardar"}
+                  {uploadingImage ? "Subiendo imagen..." : saving ? "Guardando..." : "Guardar"}
                 </Button>
                 <Button variant="outline" onClick={handleCancel} className="gap-2">
                   <X className="h-4 w-4" />
@@ -296,7 +344,6 @@ export default function AdminMenuPage() {
           </Card>
         )}
 
-        {/* Filtro por categoría */}
         <div className="flex gap-2 mb-6 flex-wrap">
           <Button
             size="sm"
@@ -317,7 +364,6 @@ export default function AdminMenuPage() {
           ))}
         </div>
 
-        {/* Lista de productos */}
         {isLoading ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Cargando productos...</p>
@@ -327,6 +373,13 @@ export default function AdminMenuPage() {
             {filteredProducts.map((product) => (
               <Card key={product.id} className={`${!product.available ? "opacity-60" : ""}`}>
                 <CardContent className="p-4">
+                  {product.image && (
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-32 object-cover rounded-lg mb-3"
+                    />
+                  )}
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <h3 className="font-semibold text-card-foreground">{product.name}</h3>
