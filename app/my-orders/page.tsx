@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
-import { getOrdersByUser, type Order } from "@/lib/orders-service"
+import { type Order } from "@/lib/orders-service"
+import { db } from "@/lib/firebase"
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, CheckCircle, AlertCircle, Clock, X } from "lucide-react"
+import { ArrowLeft, CheckCircle, AlertCircle, Clock } from "lucide-react"
 import Link from "next/link"
 
 export default function MyOrdersPage() {
@@ -16,17 +18,39 @@ export default function MyOrdersPage() {
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
-    if (authLoaded && user) {
-      getOrdersByUser(user.uid).then((userOrders) => {
-        const sorted = userOrders.sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        )
-        setOrders(sorted)
-        setIsLoaded(true)
-      })
-    } else if (authLoaded && !user) {
+    if (!authLoaded) return
+    if (!user) {
       setIsLoaded(true)
+      return
     }
+
+    const q = query(
+      collection(db, "orders"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    )
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      })) as Order[]
+      setOrders(data)
+
+      // ← actualizar el pedido seleccionado si cambió su estado
+      setSelectedOrder((prev) => {
+        if (!prev) return prev
+        const updated = data.find((o) => o.id === prev.id)
+        return updated || prev
+      })
+
+      setIsLoaded(true)
+    }, (error) => {
+      console.error("Error en tiempo real:", error)
+      setIsLoaded(true)
+    })
+
+    return () => unsubscribe()
   }, [authLoaded, user])
 
   if (!isLoaded) {
@@ -102,7 +126,7 @@ export default function MyOrdersPage() {
     const messages: Record<Order["status"], string> = {
       pending: "Tu pedido fue recibido y está siendo procesado",
       preparing: "Tu pedido se está preparando en la cocina",
-      ready: "Tu pedido está listo para recoger",
+      ready: "¡Tu pedido está listo! Pasa a recogerlo",
       completed: "Tu pedido fue retirado",
     }
     return messages[status]
@@ -138,7 +162,6 @@ export default function MyOrdersPage() {
           </Card>
         ) : (
           <div className="grid gap-8 lg:grid-cols-3">
-            {/* Lista de pedidos */}
             <div className="lg:col-span-2 space-y-4">
               {orders.map((order) => (
                 <Card
@@ -169,7 +192,6 @@ export default function MyOrdersPage() {
               ))}
             </div>
 
-            {/* Detalle del pedido */}
             <div className="lg:col-span-1">
               {selectedOrder ? (
                 <Card className="sticky top-4">
@@ -177,7 +199,7 @@ export default function MyOrdersPage() {
                     <CardTitle className="text-lg">Detalles</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="p-4 rounded-lg bg-muted">
+                    <div className={`p-4 rounded-lg ${selectedOrder.status === "ready" ? "bg-green-50 border border-green-200" : "bg-muted"}`}>
                       <p className="text-sm font-semibold text-foreground mb-1">
                         Estado: {getStatusLabel(selectedOrder.status)}
                       </p>

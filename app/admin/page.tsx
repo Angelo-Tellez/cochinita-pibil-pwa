@@ -8,9 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Trash2, Eye, Clock, CheckCircle, AlertCircle, Plus} from "lucide-react"
 import Link from "next/link"
-import { db } from "@/lib/firebase"
-import { doc, updateDoc } from "firebase/firestore"
 import { getAllOrders, archiveOrder, type Order } from "@/lib/orders-service"
+import { db } from "@/lib/firebase"
+import { doc, updateDoc, collection, query, orderBy, onSnapshot } from "firebase/firestore"
 
 type SortBy = "date" | "status" | "name"
 type FilterStatus = "all" | "pending" | "preparing" | "ready" | "completed"
@@ -26,24 +26,53 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      if (isLoaded) {
-        if (user) {
-          const admin = await isAdmin(user.uid)
-          setIsAdminUser(admin)
-          if (admin) {
-            setIsLoading(true)
-            const data = await getAllOrders()
+  const checkAdmin = async () => {
+    if (isLoaded) {
+      if (user) {
+        const admin = await isAdmin(user.uid)
+        setIsAdminUser(admin)
+        if (admin) {
+          setIsLoading(true)
+
+          // ← NUEVO: escucha en tiempo real en lugar de una sola consulta
+          const q = query(
+            collection(db, "orders"),
+            orderBy("createdAt", "desc")
+          )
+
+          const unsubscribe = onSnapshot(q, (snapshot) => {
+            const data = snapshot.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id,
+            })) as Order[]
             setOrders(data)
             setIsLoading(false)
-          }
-        }
-        setCheckingAdmin(false)
-      }
-    }
-    checkAdmin()
-  }, [user, isLoaded])
+          }, (error) => {
+            // Si falla el índice, cargar sin filtro
+            console.error("Error en tiempo real:", error)
+            setIsLoading(false)
+          })
 
+          return unsubscribe
+        }
+      }
+      setCheckingAdmin(false)
+    }
+  }
+
+  let unsubscribe: (() => void) | undefined
+
+  const run = async () => {
+    unsubscribe = await checkAdmin()
+    setCheckingAdmin(false)
+  }
+
+  run()
+
+  return () => {
+    if (unsubscribe) unsubscribe()
+  }
+}, [user, isLoaded])
   const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
     try {
       await updateDoc(doc(db, "orders", orderId), { status: newStatus })
