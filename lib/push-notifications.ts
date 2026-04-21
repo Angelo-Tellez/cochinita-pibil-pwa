@@ -13,7 +13,7 @@ export async function requestNotificationPermission(userId: string): Promise<boo
 
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-      serviceWorkerRegistration: await navigator.serviceWorker.getRegistration("/service-worker.js"),
+      // ← quita el serviceWorkerRegistration, Firebase lo encuentra solo
     })
 
     if (token) {
