@@ -74,18 +74,46 @@ export default function AdminPage() {
   }
 }, [user, isLoaded])
   const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
-    try {
-      await updateDoc(doc(db, "orders", orderId), { status: newStatus })
-      const updated = orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)
-      setOrders(updated)
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder({ ...selectedOrder, status: newStatus })
-      }
-    } catch (error) {
-      console.error("Error actualizando estado:", error)
-      alert("Error al actualizar el estado")
+  try {
+    await updateDoc(doc(db, "orders", orderId), { status: newStatus })
+    const updated = orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)
+    setOrders(updated)
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder({ ...selectedOrder, status: newStatus })
     }
+
+    // ← NUEVO: enviar notificación push cuando esté listo
+    if (newStatus === "ready") {
+      const order = updated.find((o) => o.id === orderId)
+      if (order?.userId) {
+        try {
+          // Obtener token FCM del usuario
+          const { getDoc, doc: firestoreDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          const userDoc = await getDoc(firestoreDoc(db, "users", order.userId))
+          const fcmToken = userDoc.data()?.fcmToken
+
+          if (fcmToken) {
+            await fetch("/api/notify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token: fcmToken,
+                title: "¡Tu pedido está listo!",
+                body: `Pedido #${orderId.slice(-6)} listo para recoger en Porké.`,
+              }),
+            })
+          }
+        } catch (err) {
+          console.error("Error enviando notificación:", err)
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error actualizando estado:", error)
+    alert("Error al actualizar el estado")
   }
+}
 
   const deleteOrder = async (orderId: string) => {
     if (!confirm("¿Archivar este pedido? Seguirá visible en el historial del cliente.")) return

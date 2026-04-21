@@ -10,19 +10,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, CheckCircle, AlertCircle, Clock } from "lucide-react"
 import Link from "next/link"
+import { requestNotificationPermission } from "@/lib/push-notifications"
 
 export default function MyOrdersPage() {
   const { user, isLoaded: authLoaded } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
 
+  const handleEnableNotifications = async () => {
+      if (!user) return
+      const granted = await requestNotificationPermission(user.uid)
+      setNotificationsEnabled(granted)
+      if (granted) {
+        alert("¡Notificaciones activadas! Te avisaremos cuando tu pedido esté listo.")
+      }
+    }
+    
   useEffect(() => {
     if (!authLoaded) return
     if (!user) {
       setIsLoaded(true)
       return
     }
+
+    
 
     const q = query(
       collection(db, "orders"),
@@ -72,6 +85,18 @@ export default function MyOrdersPage() {
                 Volver
               </Button>
             </Link>
+          </div>
+          <div className="w-20 flex justify-end">
+            {!notificationsEnabled && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleEnableNotifications}
+                className="text-xs gap-1"
+              >
+                🔔 Activar
+              </Button>
+            )}
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">

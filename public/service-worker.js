@@ -1,71 +1,66 @@
-// Service Worker for Cochinita Pibil PWA
-const CACHE_NAME = "cochinita-pibil-v1"
-const urlsToCache = ["/", "/app.png", "/icon-192x192.png", "/icon-512x512.png"]
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js')
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js')
 
-// Install event - cache resources
+// Configuración de Firebase
+firebase.initializeApp({
+  apiKey: "AIzaSyBRxIhfAR8_adpoHGQjQTLdEe4pD9xiJ1U",
+  authDomain: "cochinita-pibil-pwa.firebaseapp.com",
+  projectId: "cochinita-pibil-pwa",
+  storageBucket: "cochinita-pibil-pwa.firebasestorage.app",
+  messagingSenderId: "804769287417",
+  appId: "1:804769287417:web:9cfbd3df8cb92874ff6628"
+})
+
+const messaging = firebase.messaging()
+
+// Manejar notificaciones en background
+messaging.onBackgroundMessage((payload) => {
+  const { title, body } = payload.notification
+  self.registration.showNotification(title, {
+    body,
+    icon: '/porke-logo.png',
+    badge: '/porke-logo.png',
+    vibrate: [200, 100, 200],
+  })
+})
+
+// Cache
+const CACHE_NAME = "cochinita-pibil-v1"
+const urlsToCache = ["/", "/app.png"]
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE_NAME)
+    caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting()),
+      .then(() => self.skipWaiting())
   )
 })
 
-// Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames.filter((cacheName) => cacheName !== CACHE_NAME).map((cacheName) => caches.delete(cacheName)),
-        )
-      })
-      .then(() => self.clients.claim()),
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    }).then(() => self.clients.claim())
   )
 })
 
-// Fetch event - serve from cache, fallback to network
 self.addEventListener("fetch", (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== "GET") {
-    return
-  }
-
+  if (event.request.method !== "GET") return
   event.respondWith(
     caches.match(event.request).then((response) => {
-      if (response) {
+      if (response) return response
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== "basic") return response
+        const responseToCache = response.clone()
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache)
+        })
         return response
-      }
-
-      return fetch(event.request)
-        .then((response) => {
-          // Don't cache non-successful responses
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return response
-          }
-
-          // Clone the response
-          const responseToCache = response.clone()
-
-          // Cache successful responses for offline use
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache)
-          })
-
-          return response
-        })
-        .catch(() => {
-          // Return a custom offline page if needed
-          return new Response("Offline - Please check your connection", {
-            status: 503,
-            statusText: "Service Unavailable",
-            headers: new Headers({
-              "Content-Type": "text/plain",
-            }),
-          })
-        })
-    }),
+      }).catch(() => new Response("Offline", { status: 503 }))
+    })
   )
 })
