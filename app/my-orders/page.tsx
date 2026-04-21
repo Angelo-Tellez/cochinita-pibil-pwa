@@ -27,7 +27,7 @@ export default function MyOrdersPage() {
         alert("¡Notificaciones activadas! Te avisaremos cuando tu pedido esté listo.")
       }
     }
-    
+
   useEffect(() => {
     if (!authLoaded) return
     if (!user) {
@@ -169,8 +169,22 @@ export default function MyOrdersPage() {
               </Button>
             </Link>
             <h1 className="text-2xl font-bold text-primary">Mis Pedidos</h1>
-            <div className="w-20" />
-          </div>
+            <div className="w-20 flex justify-end">
+              {!notificationsEnabled && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEnableNotifications}
+                  className="text-xs gap-1"
+                >
+                  🔔 Activar
+                </Button>
+              )}
+              {notificationsEnabled && (
+                <span className="text-xs text-green-600">🔔 Activadas</span>
+              )}
+            </div>          
+            </div>
         </div>
       </header>
 
