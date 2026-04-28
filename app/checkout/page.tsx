@@ -335,10 +335,23 @@ export default function CheckoutPage() {
                             }],
                           })
                         }}
-                        onApprove={async (_data, actions) => {
-                          const order = await actions.order!.capture()
-                          const paymentId = order.id || "unknown"
-                          await handlePaymentSuccess(paymentId)
+                        onApprove={async (data, _actions) => {
+                          try {
+                            const res = await fetch("/api/paypal/capture", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ orderID: data.orderID }),
+                            })
+                            const order = await res.json()
+                            if (order.status === "COMPLETED") {
+                              await handlePaymentSuccess(order.id)
+                            } else {
+                              alert("El pago no pudo completarse. Intenta de nuevo.")
+                            }
+                          } catch (err) {
+                            console.error("Capture error:", err)
+                            alert("Error al procesar el pago.")
+                          }
                         }}
                         onError={(err) => {
                           console.error("PayPal error:", err)
