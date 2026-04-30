@@ -1,5 +1,15 @@
 import { db } from "./firebase"
-import { doc, setDoc, getDoc } from "firebase/firestore"
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore"
+import { updateProfile } from "firebase/auth"
+import { auth } from "./firebase"
+
+export const updateUserName = async (uid: string, name: string) => {
+  const userRef = doc(db, "users", uid)
+  await updateDoc(userRef, { name })
+  if (auth.currentUser) {
+    await updateProfile(auth.currentUser, { displayName: name })
+  }
+}
 
 export interface UserProfile {
   uid: string

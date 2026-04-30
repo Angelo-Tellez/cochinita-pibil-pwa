@@ -1,5 +1,4 @@
 "use client"
-import { ShoppingCart, Plus, Minus, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
@@ -8,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useState, useEffect } from "react"
 import { getProducts, type Product } from "@/lib/products-service"
 import { Footer } from "@/components/footer"
+import { User, LogOut, ShoppingCart, Settings, Plus, Minus } from "lucide-react"
 export default function HomePage() {
   const { cart, addToCart, removeFromCart } = useCart()
   const { user, logout } = useAuth()
@@ -70,8 +70,17 @@ export default function HomePage() {
                       <User className="h-4 w-4" />
                       <span>Mis Pedidos</span>
                     </Button>
-                    <Button variant="outline" size="icon" className="gap-2 bg-transparent sm:hidden">
+                    <Button variant="outline" size="icon" className="bg-transparent sm:hidden">
                       <User className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link href="/profile">
+                    <Button variant="outline" size="sm" className="gap-2 bg-transparent hidden sm:flex">
+                      <Settings className="h-4 w-4" />
+                      <span>Perfil</span>
+                    </Button>
+                    <Button variant="outline" size="icon" className="bg-transparent sm:hidden">
+                      <Settings className="h-4 w-4" />
                     </Button>
                   </Link>
                   <Button
@@ -82,6 +91,14 @@ export default function HomePage() {
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Salir</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={logout}
+                    className="text-muted-foreground hover:text-foreground sm:hidden"
+                  >
+                    <LogOut className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
