@@ -11,13 +11,15 @@ export async function POST(req: NextRequest) {
 
     await admin.messaging().send({
       token,
-      notification: { title, body },
+      data: {
+        title,
+        body,
+      },
       webpush: {
         notification: {
           title,
           body,
           icon: "/porke-logo.png",
-          vibrate: [200, 100, 200],
         },
       },
     })
