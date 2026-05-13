@@ -6,7 +6,7 @@ import { isAdmin } from "@/lib/admin-service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Trash2, Eye, Clock, CheckCircle, AlertCircle, Plus} from "lucide-react"
+import { ArrowLeft, Trash2, Eye, Clock, CheckCircle, AlertCircle, Plus } from "lucide-react"
 import Link from "next/link"
 import { getAllOrders, archiveOrder, type Order } from "@/lib/orders-service"
 import { db } from "@/lib/firebase"
@@ -26,94 +26,106 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-  const checkAdmin = async () => {
-    if (isLoaded) {
-      if (user) {
-        const admin = await isAdmin(user.uid)
-        setIsAdminUser(admin)
-        if (admin) {
-          setIsLoading(true)
+    const checkAdmin = async () => {
+      if (isLoaded) {
+        if (user) {
+          const admin = await isAdmin(user.uid)
+          setIsAdminUser(admin)
+          if (admin) {
+            setIsLoading(true)
 
-          // ← NUEVO: escucha en tiempo real en lugar de una sola consulta
-          const q = query(
-            collection(db, "orders"),
-            orderBy("createdAt", "desc")
-          )
+            // ← NUEVO: escucha en tiempo real en lugar de una sola consulta
+            const q = query(
+              collection(db, "orders"),
+              orderBy("createdAt", "desc")
+            )
 
-          const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map((doc) => ({
-              ...doc.data(),
-              id: doc.id,
-            })) as Order[]
-            setOrders(data)
-            setIsLoading(false)
-          }, (error) => {
-            // Si falla el índice, cargar sin filtro
-            console.error("Error en tiempo real:", error)
-            setIsLoading(false)
-          })
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+              const data = snapshot.docs.map((doc) => ({
+                ...doc.data(),
+                id: doc.id,
+              })) as Order[]
+              setOrders(data)
+              setIsLoading(false)
+            }, (error) => {
+              // Si falla el índice, cargar sin filtro
+              console.error("Error en tiempo real:", error)
+              setIsLoading(false)
+            })
 
-          return unsubscribe
+            return unsubscribe
+          }
         }
+        setCheckingAdmin(false)
       }
+    }
+
+    let unsubscribe: (() => void) | undefined
+
+    const run = async () => {
+      unsubscribe = await checkAdmin()
       setCheckingAdmin(false)
     }
-  }
 
-  let unsubscribe: (() => void) | undefined
+    run()
 
-  const run = async () => {
-    unsubscribe = await checkAdmin()
-    setCheckingAdmin(false)
-  }
-
-  run()
-
-  return () => {
-    if (unsubscribe) unsubscribe()
-  }
-}, [user, isLoaded])
-  const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
-  try {
-    await updateDoc(doc(db, "orders", orderId), { status: newStatus })
-    const updated = orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)
-    setOrders(updated)
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus })
+    return () => {
+      if (unsubscribe) unsubscribe()
     }
+  }, [user, isLoaded])
+  const updateOrderStatus = async (orderId: string, newStatus: Order["status"]) => {
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: newStatus })
+      const updated = orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)
+      setOrders(updated)
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus })
+      }
 
-    // ← NUEVO: enviar notificación push cuando esté listo
-    if (newStatus === "ready") {
-      const order = updated.find((o) => o.id === orderId)
-      if (order?.userId) {
-        try {
-          // Obtener token FCM del usuario
-          const { getDoc, doc: firestoreDoc } = await import("firebase/firestore")
-          const { db } = await import("@/lib/firebase")
-          const userDoc = await getDoc(firestoreDoc(db, "users", order.userId))
-          const fcmToken = userDoc.data()?.fcmToken
+      // ← NUEVO: enviar notificación push cuando esté listo
+      if (newStatus === "preparing" || newStatus === "ready" || newStatus === "completed") {
+        const order = updated.find((o) => o.id === orderId)
+        if (order?.userId) {
+          try {
+            const { getDoc, doc: firestoreDoc } = await import("firebase/firestore")
+            const { db } = await import("@/lib/firebase")
+            const userDoc = await getDoc(firestoreDoc(db, "users", order.userId))
+            const fcmToken = userDoc.data()?.fcmToken
 
-          if (fcmToken) {
-            await fetch("/api/notify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                token: fcmToken,
-                title: "¡Tu pedido está listo!",
-                body: `Pedido #${orderId.slice(-6)} listo para recoger en Porké.`,
-              }),
-            })
+            if (fcmToken) {
+              const messages: Record<string, { title: string; body: string }> = {
+                preparing: {
+                  title: "¡Tu pedido está en preparación!",
+                  body: `Pedido #${orderId.slice(-6)} se está preparando en la cocina.`,
+                },
+                ready: {
+                  title: "¡Tu pedido está listo!",
+                  body: `Pedido #${orderId.slice(-6)} listo para recoger en Porké.`,
+                },
+                completed: {
+                  title: "Pedido completado",
+                  body: `Pedido #${orderId.slice(-6)} fue retirado. ¡Gracias!`,
+                },
+              }
+
+              const { title, body } = messages[newStatus]
+
+              await fetch("/api/notify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: fcmToken, title, body }),
+              })
+            }
+          } catch (err) {
+            console.error("Error enviando notificación:", err)
           }
-        } catch (err) {
-          console.error("Error enviando notificación:", err)
         }
       }
+    } catch (error) {
+      console.error("Error actualizando estado:", error)
+      alert("Error al actualizar el estado")
     }
-  } catch (error) {
-    console.error("Error actualizando estado:", error)
-    alert("Error al actualizar el estado")
   }
-}
 
   const deleteOrder = async (orderId: string) => {
     if (!confirm("¿Archivar este pedido? Seguirá visible en el historial del cliente.")) return
