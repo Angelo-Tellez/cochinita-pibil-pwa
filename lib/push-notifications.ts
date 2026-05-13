@@ -11,13 +11,16 @@ export async function requestNotificationPermission(userId: string): Promise<boo
     const permission = await Notification.requestPermission()
     if (permission !== "granted") return false
 
+    // 👇 Agrega serviceWorkerRegistration para forzar token nuevo
+    const registration = await navigator.serviceWorker.ready
+
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-      // ← quita el serviceWorkerRegistration, Firebase lo encuentra solo
+      serviceWorkerRegistration: registration  // 👈 esto fuerza regeneración
     })
 
     if (token) {
-      // Guardar token en Firestore
+      console.log("Nuevo FCM token:", token) // 👈 para verificar en consola
       await setDoc(doc(db, "users", userId), { fcmToken: token }, { merge: true })
       return true
     }
