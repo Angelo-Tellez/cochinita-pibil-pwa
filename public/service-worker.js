@@ -13,13 +13,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
-  const { title, body } = payload.notification
-  self.registration.showNotification(title, {
-    body,
-    icon: '/porke-logo.png',
-    badge: '/porke-logo.png',
-    vibrate: [200, 100, 200],
-  })
+  console.log("Notificación recibida:", payload)
 })
 
 const CACHE_NAME = "cochinita-pibil-v2"
