@@ -27,7 +27,7 @@ export async function requestNotificationPermission(userId: string): Promise<boo
     return false
   }
 }
-
+//asdf
 export async function onForegroundMessage(callback: (payload: any) => void) {
   const messaging = await getFirebaseMessaging()
   if (!messaging) return
