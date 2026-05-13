@@ -15,8 +15,15 @@ export async function POST(req: NextRequest) {
         title,
         body,
       },
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: "/porke-logo.png",
+        },
+      },
     })
-    //
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error("Error completo:", JSON.stringify(error, null, 2))

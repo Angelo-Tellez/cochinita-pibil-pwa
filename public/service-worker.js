@@ -13,7 +13,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
-  console.log("Notificación recibida:", payload)
+  //console.log("Notificación recibida:", payload)
 })
 
 const CACHE_NAME = "cochinita-pibil-v2"
