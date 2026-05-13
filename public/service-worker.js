@@ -1,7 +1,6 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js')
 
-// Configuración de Firebase
 firebase.initializeApp({
   apiKey: "AIzaSyBRxIhfAR8_adpoHGQjQTLdEe4pD9xiJ1U",
   authDomain: "cochinita-pibil-pwa.firebaseapp.com",
@@ -13,7 +12,6 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging()
 
-// Manejar notificaciones en background
 messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification
   self.registration.showNotification(title, {
@@ -24,9 +22,8 @@ messaging.onBackgroundMessage((payload) => {
   })
 })
 
-// Cache
-const CACHE_NAME = "cochinita-pibil-v1"
-const urlsToCache = ["/", "/app.png"]
+const CACHE_NAME = "cochinita-pibil-v2"
+const urlsToCache = ["/"]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
