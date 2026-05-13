@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import admin from "@/lib/firebase-admin"
 
 export async function POST(req: NextRequest) {
@@ -23,8 +23,13 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Error enviando notificación:", error)
-    return NextResponse.json({ error: "Error enviando notificación" }, { status: 500 })
+  } catch (error: any) {
+    console.error("Error completo:", JSON.stringify(error, null, 2))
+    console.error("Mensaje:", error.message)
+    console.error("Codigo:", error.code)
+    return NextResponse.json({
+      error: error.message,
+      code: error.code
+    }, { status: 500 })
   }
 }
