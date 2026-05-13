@@ -20,13 +20,13 @@ export default function MyOrdersPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
 
   const handleEnableNotifications = async () => {
-      if (!user) return
-      const granted = await requestNotificationPermission(user.uid)
-      setNotificationsEnabled(granted)
-      if (granted) {
-        alert("¡Notificaciones activadas! Te avisaremos cuando tu pedido esté listo.")
-      }
+    if (!user) return
+    const granted = await requestNotificationPermission(user.uid)
+    setNotificationsEnabled(granted)
+    if (granted) {
+      alert("¡Notificaciones activadas! Te avisaremos cuando tu pedido esté listo.")
     }
+  }
 
   useEffect(() => {
     if (!authLoaded) return
@@ -34,9 +34,6 @@ export default function MyOrdersPage() {
       setIsLoaded(true)
       return
     }
-
-    
-
     const q = query(
       collection(db, "orders"),
       where("userId", "==", user.uid),
@@ -64,6 +61,15 @@ export default function MyOrdersPage() {
     })
 
     return () => unsubscribe()
+  }, [authLoaded, user])
+
+  useEffect(() => {
+    if (!authLoaded || !user) return
+    if (Notification.permission === "granted") {
+      requestNotificationPermission(user.uid).then((granted) => {
+        setNotificationsEnabled(granted)
+      })
+    }
   }, [authLoaded, user])
 
   if (!isLoaded) {
@@ -183,8 +189,8 @@ export default function MyOrdersPage() {
               {notificationsEnabled && (
                 <span className="text-xs text-green-600">🔔 Activadas</span>
               )}
-            </div>          
             </div>
+          </div>
         </div>
       </header>
 
