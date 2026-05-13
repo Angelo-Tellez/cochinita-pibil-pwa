@@ -100,14 +100,6 @@ export default function HomePage() {
                   >
                     <LogOut className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={logout}
-                    className="text-muted-foreground hover:text-foreground sm:hidden"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </Button>
                 </>
               ) : (
                 <Link href="/login">
