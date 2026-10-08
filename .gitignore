@@ -18,3 +18,10 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# auditoría anti-bots
+logs/
+
+# documentos de Word (entregas)
+*.docx
+~$*
+PRACTICA-ANTIBOTS.md

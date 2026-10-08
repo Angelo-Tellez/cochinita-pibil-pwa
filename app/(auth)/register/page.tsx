@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Honeypot, CaptchaField } from "@/components/human-check"
+import { useHumanCheck } from "@/hooks/use-human-check"
 import Link from "next/link"
 
 function RegisterForm() {
@@ -23,6 +25,10 @@ function RegisterForm() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [shouldRedirect, setShouldRedirect] = useState(false)
+  const { formRef, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck(
+    "register",
+    ["name", "email", "phone", "password", "confirmPassword"] as const,
+  )
 
   useEffect(() => {
     if (shouldRedirect && isLoaded && user) {
@@ -32,8 +38,8 @@ function RegisterForm() {
   }, [shouldRedirect, isLoaded, user])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    const field = fieldFromName(e.target.name)
+    if (field) setFormData((prev) => ({ ...prev, [field]: e.target.value }))
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -47,6 +53,9 @@ function RegisterForm() {
     if (formData.password !== formData.confirmPassword) { setError("Las contraseñas no coinciden"); return }
 
     setIsLoading(true)
+    const check = await verify(e)
+    if (!check.ok) { setError(check.error); setIsLoading(false); return }
+
     const result = await register(formData.email, formData.password, formData.name, formData.phone)
     if (result.success) {
       router.push("/verify-email")  // ← redirige a verificación
@@ -74,61 +83,73 @@ function RegisterForm() {
           <CardTitle>Crear Cuenta</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form ref={formRef} onSubmit={handleRegister} className="space-y-4">
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">{error}</div>
             )}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Nombre Completo</label>
+              <label htmlFor={fieldNames.name} className="block text-sm font-medium text-foreground mb-1">Nombre Completo</label>
               <Input
                 type="text"
-                name="name"
+                id={fieldNames.name}
+                name={fieldNames.name}
+                autoComplete="name"
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Juan Pérez"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Email</label>
+              <label htmlFor={fieldNames.email} className="block text-sm font-medium text-foreground mb-1">Email</label>
               <Input
                 type="email"
-                name="email"
+                id={fieldNames.email}
+                name={fieldNames.email}
+                autoComplete="email"
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="tu@email.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Contraseña</label>
+              <label htmlFor={fieldNames.password} className="block text-sm font-medium text-foreground mb-1">Contraseña</label>
               <Input
                 type="password"
-                name="password"
+                id={fieldNames.password}
+                name={fieldNames.password}
+                autoComplete="new-password"
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="••••••"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Teléfono *</label>
+              <label htmlFor={fieldNames.phone} className="block text-sm font-medium text-foreground mb-1">Teléfono *</label>
               <Input
                 type="tel"
-                name="phone"
+                id={fieldNames.phone}
+                name={fieldNames.phone}
+                autoComplete="tel"
                 value={formData.phone}
                 onChange={handleInputChange}
                 placeholder="+52 (555) 123-4567"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">Confirmar Contraseña</label>
+              <label htmlFor={fieldNames.confirmPassword} className="block text-sm font-medium text-foreground mb-1">Confirmar Contraseña</label>
               <Input
                 type="password"
-                name="confirmPassword"
+                id={fieldNames.confirmPassword}
+                name={fieldNames.confirmPassword}
+                autoComplete="new-password"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
                 placeholder="••••••"
               />
             </div>
 
+            <Honeypot {...honeypotProps} />
+            <CaptchaField {...captcha} />
             <Button
               type="submit"
               disabled={isLoading}
