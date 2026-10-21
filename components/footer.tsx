@@ -55,6 +55,12 @@ export function Footer() {
                   Formas de Compra
                 </button>
               </Link>
+              <br />
+              <Link href="/seguridad" className="inline-block">
+                <button className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                  Seguridad del Sitio
+                </button>
+              </Link>
             </div>
           </div>
         </div>

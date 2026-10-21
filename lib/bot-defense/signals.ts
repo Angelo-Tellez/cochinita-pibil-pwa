@@ -36,13 +36,20 @@ function stdDev(values: number[]) {
   return Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / values.length)
 }
 
-export function assess(s: Partial<ClientSignals>, h: HeaderSignals): Assessment {
+// Datos que mide el propio servidor a partir del token del formulario diferido
+export interface ServerSignals {
+  formElapsedMs: number | null // null = no hay token válido (POST directo a la API)
+}
+
+export function assess(s: Partial<ClientSignals>, h: HeaderSignals, server?: ServerSignals): Assessment {
   let score = 0
   const reasons: string[] = []
   const add = (points: number, reason: string) => { score += points; reasons.push(`+${points} ${reason}`) }
 
   // --- Señales duras (muy robustas) ---
   if (s.honeypot) add(10, "honeypot lleno")
+  if (server && server.formElapsedMs === null) add(4, "sin token de formulario (petición directa a la API)")
+  if (server?.formElapsedMs != null && server.formElapsedMs < 1500) add(3, `formulario enviado ${server.formElapsedMs} ms después de cargarse (medido en servidor)`)
   if (s.webdriver) add(5, "navigator.webdriver = true")
   if (/HeadlessChrome|PhantomJS|Selenium|puppeteer|playwright/i.test(h.userAgent)) add(5, "User-Agent de navegador headless/automatizado")
   if (h.secChUa && /HeadlessChrome/i.test(h.secChUa)) add(3, "Sec-CH-UA headless")

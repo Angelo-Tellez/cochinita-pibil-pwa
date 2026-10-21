@@ -11,6 +11,7 @@ import Link from "next/link"
 import { getAllOrders, archiveOrder, type Order } from "@/lib/orders-service"
 import { db } from "@/lib/firebase"
 import { doc, updateDoc, collection, query, orderBy, onSnapshot } from "firebase/firestore"
+import { secureFetch } from "@/lib/secure-fetch"
 
 type SortBy = "date" | "status" | "name"
 type FilterStatus = "all" | "pending" | "preparing" | "ready" | "completed"
@@ -110,7 +111,7 @@ export default function AdminPage() {
 
               const { title, body } = messages[newStatus]
 
-              await fetch("/api/notify", {
+              await secureFetch("/api/notify", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token: fcmToken, title, body }),

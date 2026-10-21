@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Honeypot, CaptchaField } from "@/components/human-check"
+import { Honeypot, CaptchaWidget, FormSkeleton } from "@/components/human-check"
 import { useHumanCheck } from "@/hooks/use-human-check"
 import Link from "next/link"
 
@@ -19,7 +19,7 @@ function LoginForm() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [shouldRedirect, setShouldRedirect] = useState(false)
-  const { formRef, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck("login", ["email", "password"] as const)
+  const { formRef, ready, loadError, reload, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck("login", ["email", "password"] as const)
 
   useEffect(() => {
     if (shouldRedirect && isLoaded && user) {
@@ -70,6 +70,7 @@ function LoginForm() {
           <CardTitle>Iniciar Sesión</CardTitle>
         </CardHeader>
         <CardContent>
+          {!ready ? <FormSkeleton fields={2} error={loadError} onRetry={reload} /> : (
           <form ref={formRef} onSubmit={handleLogin} className="space-y-4">
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">{error}</div>
@@ -99,7 +100,7 @@ function LoginForm() {
               />
             </div>
             <Honeypot {...honeypotProps} />
-            <CaptchaField {...captcha} />
+            <CaptchaWidget {...captcha} />
             <Button
               type="submit"
               disabled={isLoading}
@@ -140,6 +141,7 @@ function LoginForm() {
               </Link>
             </p>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -13,6 +13,7 @@ import Link from "next/link"
 import { saveOrder } from "@/lib/orders-service"
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js"
 import { updateUserPhone } from "@/lib/users-service"
+import { secureFetch } from "@/lib/secure-fetch"
 
 const PICKUP_TIMES = ["15 minutos", "30 minutos", "45 minutos", "1 hora", "1 hora 30 min", "2 horas"]
 
@@ -337,7 +338,7 @@ export default function CheckoutPage() {
                         }}
                         onApprove={async (data, _actions) => {
                           try {
-                            const res = await fetch("/api/paypal/capture", {
+                            const res = await secureFetch("/api/paypal/capture", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ orderID: data.orderID }),

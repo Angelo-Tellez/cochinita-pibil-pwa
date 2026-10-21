@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Honeypot, CaptchaField } from "@/components/human-check"
+import { Honeypot, CaptchaWidget, FormSkeleton } from "@/components/human-check"
 import { useHumanCheck } from "@/hooks/use-human-check"
 import Link from "next/link"
 
@@ -25,7 +25,7 @@ function RegisterForm() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [shouldRedirect, setShouldRedirect] = useState(false)
-  const { formRef, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck(
+  const { formRef, ready, loadError, reload, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck(
     "register",
     ["name", "email", "phone", "password", "confirmPassword"] as const,
   )
@@ -83,6 +83,7 @@ function RegisterForm() {
           <CardTitle>Crear Cuenta</CardTitle>
         </CardHeader>
         <CardContent>
+          {!ready ? <FormSkeleton fields={5} error={loadError} onRetry={reload} /> : (
           <form ref={formRef} onSubmit={handleRegister} className="space-y-4">
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">{error}</div>
@@ -149,7 +150,7 @@ function RegisterForm() {
             </div>
 
             <Honeypot {...honeypotProps} />
-            <CaptchaField {...captcha} />
+            <CaptchaWidget {...captcha} />
             <Button
               type="submit"
               disabled={isLoading}
@@ -190,6 +191,7 @@ function RegisterForm() {
               </Link>
             </p>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

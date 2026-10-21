@@ -25,3 +25,7 @@ logs/
 *.docx
 ~$*
 PRACTICA-ANTIBOTS.md
+
+# Python
+.venv/
+__pycache__/

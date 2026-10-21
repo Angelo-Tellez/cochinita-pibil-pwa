@@ -3,23 +3,18 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { ClientSignals } from "@/lib/bot-defense/signals"
+import type { PublicChallenge } from "@/lib/bot-defense/captcha/types"
+import { postJson } from "@/lib/secure-fetch"
 
-export interface Challenge {
-  question: string
-  token: string
-}
-
-type VerifyResult = { ok: true } | { ok: false; error: string }
+type VerifyResult = { ok: true; data: any } | { ok: false; error: string }
 
 const MAX_SAMPLES = 30
 
-function randomSuffix() {
-  return Math.random().toString(36).slice(2, 8)
-}
-
-// Recolecta señales de interacción del formulario y las envía a /api/verify-human.
-// `fieldNames` genera atributos name/id que cambian en cada carga para que un script
-// no pueda depender de selectores fijos como By.NAME("email").
+// 1. Carga diferida: pide a /api/form-session los nombres de campo (aleatorios, generados
+//    en el servidor), el token del formulario y, si aplica, el primer CAPTCHA.
+// 2. Recolecta señales de interacción (mouse, teclado, clics, pegado, autocompletado).
+// 3. En el submit envía todo, más el pase del CAPTCHA, a /api/verify-human (o al endpoint
+//    del formulario) con el token CSRF.
 export function useHumanCheck<K extends string>(form: string, fields: readonly K[]) {
   const formRef = useRef<HTMLFormElement>(null)
   const start = useRef(0)
@@ -36,19 +31,38 @@ export function useHumanCheck<K extends string>(form: string, fields: readonly K
     lastKey: 0,
   })
 
-  const [fieldNames, setFieldNames] = useState(() => Object.fromEntries(fields.map((f) => [f, f as string])) as Record<K, string>)
-  const [honeypotName, setHoneypotName] = useState("website")
+  const [ready, setReady] = useState(false)
+  const [loadError, setLoadError] = useState("")
+  const [fieldNames, setFieldNames] = useState(() => Object.fromEntries(fields.map((f) => [f, ""])) as Record<K, string>)
+  const [formToken, setFormToken] = useState("")
+  const [honeypotName, setHoneypotName] = useState("")
   const [honeypot, setHoneypot] = useState("")
-  const [challenge, setChallenge] = useState<Challenge | null>(null)
-  const [captchaAnswer, setCaptchaAnswer] = useState("")
+  const [challenge, setChallenge] = useState<PublicChallenge | null>(null)
+  const [pass, setPass] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoadError("")
+    try {
+      const { res, data } = await postJson("/api/form-session", { form })
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el formulario")
+      setFieldNames(data.fields)
+      setHoneypotName(data.honeypot)
+      setFormToken(data.formToken)
+      setChallenge(data.challenge ?? null)
+      setPass(null)
+      start.current = performance.now()
+      setReady(true)
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "No se pudo cargar el formulario")
+    }
+  }, [form])
 
   useEffect(() => {
-    // Se genera tras el montaje para no provocar errores de hidratación
-    const suffix = randomSuffix()
-    setFieldNames(Object.fromEntries(fields.map((f) => [f, `${f.slice(0, 2)}_${suffix}_${randomSuffix()}`])) as Record<K, string>)
-    setHoneypotName(`url_${randomSuffix()}`)
-    start.current = performance.now()
+    load()
+  }, [load])
 
+  // Señales a nivel de ventana
+  useEffect(() => {
     const s = stats.current
     const push = (arr: number[], v: number) => { arr.push(Math.round(v)); if (arr.length > MAX_SAMPLES) arr.shift() }
 
@@ -65,6 +79,24 @@ export function useHumanCheck<K extends string>(form: string, fields: readonly K
       if (s.lastClick) push(s.clickIntervals, now - s.lastClick)
       s.lastClick = now
     }
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true })
+    window.addEventListener("touchstart", onTouch, { passive: true })
+    window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("click", onClick)
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove)
+      window.removeEventListener("touchstart", onTouch)
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("click", onClick)
+    }
+  }, [])
+
+  // Señales del formulario: se enganchan cuando el formulario diferido ya existe en el DOM
+  useEffect(() => {
+    const formEl = formRef.current
+    if (!ready || !formEl) return
+    const s = stats.current
     const onPaste = () => { s.pastes++ }
     const onFocus = () => { s.focusChanges++ }
     // Autocompletado del navegador / gestor de contraseñas: el input llega sin inputType
@@ -72,27 +104,15 @@ export function useHumanCheck<K extends string>(form: string, fields: readonly K
       const ie = e as InputEvent
       if (!ie.inputType || ie.inputType === "insertReplacementText") s.autofilled = true
     }
-
-    window.addEventListener("pointermove", onPointerMove, { passive: true })
-    window.addEventListener("touchstart", onTouch, { passive: true })
-    window.addEventListener("keydown", onKeyDown)
-    window.addEventListener("click", onClick)
-    const formEl = formRef.current
-    formEl?.addEventListener("paste", onPaste)
-    formEl?.addEventListener("focusin", onFocus)
-    formEl?.addEventListener("input", onInput)
-
+    formEl.addEventListener("paste", onPaste)
+    formEl.addEventListener("focusin", onFocus)
+    formEl.addEventListener("input", onInput)
     return () => {
-      window.removeEventListener("pointermove", onPointerMove)
-      window.removeEventListener("touchstart", onTouch)
-      window.removeEventListener("keydown", onKeyDown)
-      window.removeEventListener("click", onClick)
-      formEl?.removeEventListener("paste", onPaste)
-      formEl?.removeEventListener("focusin", onFocus)
-      formEl?.removeEventListener("input", onInput)
+      formEl.removeEventListener("paste", onPaste)
+      formEl.removeEventListener("focusin", onFocus)
+      formEl.removeEventListener("input", onInput)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [ready])
 
   // Traduce el name aleatorio de un input al nombre lógico del campo
   const fieldFromName = useCallback(
@@ -101,7 +121,9 @@ export function useHumanCheck<K extends string>(form: string, fields: readonly K
   )
 
   const verify = useCallback(
-    async (e: React.FormEvent): Promise<VerifyResult> => {
+    async (e: React.FormEvent, opts: { endpoint?: string; data?: object } = {}): Promise<VerifyResult> => {
+      if (challenge && !pass) return { ok: false, error: "Completa la verificación de seguridad" }
+
       const s = stats.current
       const signals: ClientSignals = {
         elapsedMs: Math.round(performance.now() - start.current),
@@ -119,39 +141,38 @@ export function useHumanCheck<K extends string>(form: string, fields: readonly K
       }
 
       try {
-        const res = await fetch("/api/verify-human", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            form,
-            signals,
-            captcha: challenge ? { token: challenge.token, answer: captchaAnswer } : undefined,
-          }),
+        const { res, data } = await postJson(opts.endpoint ?? "/api/verify-human", {
+          form,
+          formToken,
+          signals,
+          captchaPass: pass ?? undefined,
+          data: opts.data,
         })
-        const data = await res.json().catch(() => ({}))
+        // El pase es de un solo uso, salvo que el servidor rechace antes de canjearlo (400 / 429)
+        if (res.status === 400 || res.status === 429) return { ok: false, error: res.status === 429
+          ? `Demasiados intentos. Intenta de nuevo en ${res.headers.get("Retry-After") ?? "unos"} segundos.`
+          : data.error || "Revisa los datos del formulario" }
+        setPass(null)
 
         if (res.ok && data.ok) {
           setChallenge(null)
-          setCaptchaAnswer("")
-          return { ok: true }
+          return { ok: true, data }
         }
-        if (res.status === 429) {
-          return { ok: false, error: `Demasiados intentos. Intenta de nuevo en ${res.headers.get("Retry-After") ?? "unos"} segundos.` }
-        }
-        if (data.requireCaptcha && data.challenge) {
-          setChallenge(data.challenge)
-          setCaptchaAnswer("")
-        }
+        if (data.challenge) setChallenge(data.challenge)
+        else if (pass) setChallenge(null)
         return { ok: false, error: data.error || "No pudimos verificar la solicitud" }
       } catch {
         return { ok: false, error: "Error de conexión al verificar la solicitud" }
       }
     },
-    [form, honeypot, challenge, captchaAnswer],
+    [form, formToken, honeypot, challenge, pass],
   )
 
   return {
     formRef,
+    ready,
+    loadError,
+    reload: load,
     fieldNames,
     fieldFromName,
     verify,
@@ -160,6 +181,11 @@ export function useHumanCheck<K extends string>(form: string, fields: readonly K
       value: honeypot,
       onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHoneypot(e.target.value),
     },
-    captcha: { challenge, answer: captchaAnswer, setAnswer: setCaptchaAnswer },
+    captcha: {
+      challenge,
+      passed: !!pass,
+      onPass: setPass,
+      onChallenge: (c: PublicChallenge) => { setPass(null); setChallenge(c) },
+    },
   }
 }
