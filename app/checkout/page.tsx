@@ -14,6 +14,7 @@ import { saveOrder } from "@/lib/orders-service"
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js"
 import { updateUserPhone } from "@/lib/users-service"
 import { secureFetch } from "@/lib/secure-fetch"
+import { PuzzleGate } from "@/components/captcha/puzzle-gate"
 
 const PICKUP_TIMES = ["15 minutos", "30 minutos", "45 minutos", "1 hora", "1 hora 30 min", "2 horas"]
 
@@ -32,6 +33,8 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPaypal, setShowPaypal] = useState(false)
   const [formError, setFormError] = useState("")
+  // Candado anti-bot: hay que resolver el rompecabezas antes de poder pagar
+  const [puzzleVerified, setPuzzleVerified] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
@@ -139,6 +142,10 @@ export default function CheckoutPage() {
 
   const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!puzzleVerified) {
+      setFormError("Resuelve el rompecabezas de seguridad antes de pagar")
+      return
+    }
     if (validateForm()) {
       setShowPaypal(true)
     }
@@ -309,13 +316,21 @@ export default function CheckoutPage() {
                   </div>
 
                   {!showPaypal ? (
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      Proceder al Pago
-                    </Button>
+                    <>
+                      {!puzzleVerified && (
+                        <PuzzleGate
+                          onVerified={() => { setPuzzleVerified(true); setFormError("") }}
+                          onReset={() => setPuzzleVerified(false)}
+                        />
+                      )}
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !puzzleVerified}
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {puzzleVerified ? "Proceder al Pago" : "Resuelve el rompecabezas para pagar"}
+                      </Button>
+                    </>
                   ) : (
                     <div className="space-y-3">
                       <p className="text-sm text-center text-muted-foreground">
