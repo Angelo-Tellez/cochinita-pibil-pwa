@@ -15,6 +15,7 @@ function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { register, loginWithGoogle, user, isLoaded } = useAuth()
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -22,9 +23,14 @@ function RegisterForm() {
     password: "",
     confirmPassword: "",
   })
+  
+  // Estado 100% independiente para evitar el bloqueo 400 de la pregunta de seguridad
+  const [securityQuestion, setSecurityQuestion] = useState("")
+  
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [shouldRedirect, setShouldRedirect] = useState(false)
+  
   const { formRef, ready, loadError, reload, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck(
     "register",
     ["name", "email", "phone", "password", "confirmPassword"] as const,
@@ -39,7 +45,9 @@ function RegisterForm() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const field = fieldFromName(e.target.name)
-    if (field) setFormData((prev) => ({ ...prev, [field]: e.target.value }))
+    if (field) {
+      setFormData((prev) => ({ ...prev, [field]: e.target.value }))
+    }
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -49,16 +57,23 @@ function RegisterForm() {
     if (!formData.name.trim()) { setError("Por favor ingresa tu nombre"); return }
     if (!formData.email.trim()) { setError("Por favor ingresa tu email"); return }
     if (!formData.phone.trim()) { setError("Por favor ingresa tu teléfono"); return }
+    if (!securityQuestion.trim()) { setError("Por favor responde la pregunta de seguridad"); return }
     if (formData.password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres"); return }
     if (formData.password !== formData.confirmPassword) { setError("Las contraseñas no coinciden"); return }
 
     setIsLoading(true)
+
+    // Ejecutamos el widget de seguridad oficial
     const check = await verify(e)
-    if (!check.ok) { setError(check.error); setIsLoading(false); return }
+    if (!check.ok) { 
+      setError(check.error || "Error en la verificación de seguridad"); 
+      setIsLoading(false); 
+      return 
+    }
 
     const result = await register(formData.email, formData.password, formData.name, formData.phone)
     if (result.success) {
-      router.push("/verify-email")  // ← redirige a verificación
+      router.push("/verify-email") 
     } else {
       setError(result.error || "Error al registrarse")
       setIsLoading(false)
@@ -88,93 +103,49 @@ function RegisterForm() {
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">{error}</div>
             )}
+            
             <div>
               <label htmlFor={fieldNames.name} className="block text-sm font-medium text-foreground mb-1">Nombre Completo</label>
-              <Input
-                type="text"
-                id={fieldNames.name}
-                name={fieldNames.name}
-                autoComplete="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Juan Pérez"
-              />
+              <Input type="text" id={fieldNames.name} name={fieldNames.name} autoComplete="name" value={formData.name} onChange={handleInputChange} placeholder="Juan Pérez" />
             </div>
             <div>
               <label htmlFor={fieldNames.email} className="block text-sm font-medium text-foreground mb-1">Email</label>
-              <Input
-                type="email"
-                id={fieldNames.email}
-                name={fieldNames.email}
-                autoComplete="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="tu@email.com"
-              />
+              <Input type="email" id={fieldNames.email} name={fieldNames.email} autoComplete="email" value={formData.email} onChange={handleInputChange} placeholder="tu@email.com" />
             </div>
             <div>
               <label htmlFor={fieldNames.password} className="block text-sm font-medium text-foreground mb-1">Contraseña</label>
-              <Input
-                type="password"
-                id={fieldNames.password}
-                name={fieldNames.password}
-                autoComplete="new-password"
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder="••••••"
-              />
+              <Input type="password" id={fieldNames.password} name={fieldNames.password} autoComplete="new-password" value={formData.password} onChange={handleInputChange} placeholder="••••••" />
             </div>
             <div>
               <label htmlFor={fieldNames.phone} className="block text-sm font-medium text-foreground mb-1">Teléfono *</label>
-              <Input
-                type="tel"
-                id={fieldNames.phone}
-                name={fieldNames.phone}
-                autoComplete="tel"
-                value={formData.phone}
-                onChange={handleInputChange}
-                placeholder="+52 (555) 123-4567"
-              />
+              <Input type="tel" id={fieldNames.phone} name={fieldNames.phone} autoComplete="tel" value={formData.phone} onChange={handleInputChange} placeholder="+52 (555) 123-4567" />
             </div>
             <div>
               <label htmlFor={fieldNames.confirmPassword} className="block text-sm font-medium text-foreground mb-1">Confirmar Contraseña</label>
-              <Input
-                type="password"
-                id={fieldNames.confirmPassword}
-                name={fieldNames.confirmPassword}
-                autoComplete="new-password"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                placeholder="••••••"
-              />
+              <Input type="password" id={fieldNames.confirmPassword} name={fieldNames.confirmPassword} autoComplete="new-password" value={formData.confirmPassword} onChange={handleInputChange} placeholder="••••••" />
+            </div>
+
+            <div>
+              <label htmlFor="securityQuestion" className="block text-sm font-medium text-foreground mb-1">
+                Pregunta de seguridad: ¿De qué estado de México es originaria la cochinita pibil?
+              </label>
+              <Input type="text" id="securityQuestion" name="securityQuestion" value={securityQuestion} onChange={(e) => setSecurityQuestion(e.target.value)} placeholder="Ej. Jalisco, Yucatán, Sonora..." required />
             </div>
 
             <Honeypot {...honeypotProps} />
+            {/* WIDGET ORIGINAL RESTAURADO */}
             <CaptchaWidget {...captcha} />
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
+            
+            <Button type="submit" disabled={isLoading} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
               {isLoading ? "Registrando..." : "Registrarse"}
             </Button>
 
             <div className="relative my-2">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-2 text-muted-foreground">o continúa con</span>
-              </div>
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">o continúa con</span></div>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGoogleRegister}
-              disabled={isLoading}
-              className="w-full bg-transparent flex items-center gap-2"
-            >
+            <Button type="button" variant="outline" onClick={handleGoogleRegister} disabled={isLoading} className="w-full bg-transparent flex items-center gap-2">
               <svg width="18" height="18" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.7 0 6.7 5.4 2.7 13.3l7.8 6C12.4 13 17.8 9.5 24 9.5z"/>
                 <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 6.9-9.9 6.9-17z"/>
@@ -183,13 +154,6 @@ function RegisterForm() {
               </svg>
               Registrarse con Google
             </Button>
-
-            <p className="text-center text-sm text-muted-foreground">
-              ¿Ya tienes cuenta?{" "}
-              <Link href="/login" className="text-primary font-semibold hover:underline">
-                Inicia Sesión
-              </Link>
-            </p>
           </form>
           )}
         </CardContent>
@@ -200,11 +164,7 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">Cargando...</p>
-      </div>
-    }>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p>Cargando...</p></div>}>
       <RegisterForm />
     </Suspense>
   )
