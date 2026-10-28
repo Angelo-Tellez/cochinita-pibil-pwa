@@ -64,8 +64,8 @@ function RegisterForm() {
     setIsLoading(true)
 
     // Ejecutamos el widget de seguridad oficial
-    const check = await verify(e)
-    if (!check.ok) { 
+    const check = await verify(e, { data: { securityQuestion } })
+    if (!check.ok) {
       setError(check.error || "Error en la verificación de seguridad"); 
       setIsLoading(false); 
       return 

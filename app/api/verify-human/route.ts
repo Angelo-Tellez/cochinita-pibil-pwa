@@ -1,90 +1,32 @@
-import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { NextRequest } from "next/server"
+import { auditLog } from "@/lib/bot-defense/audit-log"
+import { protect } from "@/lib/bot-defense/guard"
+import { evaluateSubmission } from "@/lib/bot-defense/human-check"
 
-// Almacenamiento en memoria para el Rate Limiting (Actividad 3)
-const requestCounts = new Map<string, { count: number; resetTime: number }>()
+const normalize = (s: string) => s.toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "")
 
-export async function POST(request: Request) {
-    try {
-        const headersList = await headers()
-        const clientIp = headersList.get('x-forwarded-for') || '127.0.0.1'
-        const now = Date.now()
+// Verificación previa al login / registro (el envío final de credenciales va a Firebase).
+// protect() aplica sesión, rate limit (5/min por sesión) y CSRF; evaluateSubmission()
+// canjea el pase del CAPTCHA (firmado, de un solo uso y ligado a la sesión), así que un
+// captchaPass inventado o reutilizado se rechaza aunque el resto del body sea válido.
+export async function POST(req: NextRequest) {
+  return protect(req, { scope: "form", concurrency: true }, async (ctx) => {
+    const body = await req.json().catch(() => ({}))
 
-        // ACTIVIDAD 3: Control de límite de solicitudes (Rate Limiting - 5 peticiones por minuto)
-        const windowMs = 60 * 1000 // 1 minuto
-        const maxRequests = 5
-
-        let clientRecord = requestCounts.get(clientIp)
-        if (!clientRecord || now > clientRecord.resetTime) {
-            clientRecord = { count: 1, resetTime: now + windowMs }
-            requestCounts.set(clientIp, clientRecord)
-        } else {
-            clientRecord.count++
-            if (clientRecord.count > maxRequests) {
-                const retryAfter = Math.ceil((clientRecord.resetTime - now) / 1000)
-                console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","scope":"form","reason":"rate_limited"}`)
-                return NextResponse.json(
-                    { 
-                        ok: false, 
-                        error: `Demasiados intentos. Intenta de nuevo en ${retryAfter} segundos.` 
-                    }, 
-                    { status: 429 } // HTTP 429 Too Many Requests
-                )
-            }
-        }
-
-        // Extraemos el cuerpo de la petición de forma segura
-        const body = await request.json().catch(() => ({}))
-
-                const signals = body.signals ?? {}
-
-        // Campos de control obligatorios
-        if (typeof body.captchaPass !== 'string' || typeof body.formToken !== 'string') {
-            console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"missing_control_fields"}`)
-            return NextResponse.json({ ok: false, error: "Solicitud inválida." }, { status: 400 })
-        }
-
-        // Honeypot: un humano nunca llena este campo
-        if (signals.honeypot && String(signals.honeypot).trim() !== "") {
-            console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"honeypot_filled"}`)
-            return NextResponse.json({ ok: false, error: "Solicitud rechazada." }, { status: 403 })
-        }
-
-        // Navegador automatizado (Selenium/Puppeteer)
-        if (signals.webdriver === true) {
-            console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"webdriver_detected"}`)
-            return NextResponse.json({ ok: false, error: "Solicitud rechazada." }, { status: 403 })
-        }
-        // Buscamos la respuesta en todos lados (por si el hook la anidó)
-        const rawAnswer = body.securityQuestion ?? body.fields?.securityQuestion ?? body.data?.securityQuestion
-
-        // ACTIVIDAD 1: Validación de la Pregunta de Conocimiento Sencillo
-        // Solo la evaluamos si el hook permitió que viajara, evitando el error 400 injusto.
-        if (rawAnswer !== undefined && rawAnswer !== null && String(rawAnswer).trim() !== "") {
-            const answer = String(rawAnswer).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            
-            if (answer !== "yucatan") {
-                console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"invalid_security_question"}`)
-                return NextResponse.json(
-                    { 
-                        ok: false, 
-                        error: "Respuesta incorrecta. Pista: Es el estado del sureste mexicano famoso por este platillo." 
-                    }, 
-                    { status: 400 }
-                )
-            }
-        }
-
-        // Si el campo fue filtrado por el ofuscador, lo dejamos pasar porque en register/page.tsx
-        // ya pusimos un candado estricto que no deja enviar el formulario vacío.
-        
-        // Validación exitosa de los mecanismos de seguridad
-        return NextResponse.json({ ok: true })
-
-    } catch (error) {
-        return NextResponse.json(
-            { ok: false, error: "Error interno en la validación de seguridad." }, 
-            { status: 500 }
+    // Pregunta de conocimiento del registro: se valida antes de canjear el pase (un 400
+    // no consume el pase en el cliente, así el usuario sólo corrige la respuesta)
+    if (body.form === "register") {
+      const answer = normalize(String(body.data?.securityQuestion ?? ""))
+      if (answer !== "yucatan") {
+        auditLog({ ...ctx.baseLog, event: "blocked", form: "register", reason: "invalid_security_question", status: 400 })
+        return ctx.respond(
+          { ok: false, error: "Respuesta incorrecta. Pista: Es el estado del sureste mexicano famoso por este platillo." },
+          400,
         )
+      }
     }
+
+    const result = await evaluateSubmission(ctx, body)
+    return result.ok ? ctx.respond({ ok: true }) : ctx.respond(result.body, result.status)
+  })
 }
