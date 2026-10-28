@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Honeypot, CaptchaWidget, FormSkeleton } from "@/components/human-check"
 import { useHumanCheck } from "@/hooks/use-human-check"
+import { TurnstileWidget } from "@/components/captcha/turnstile-widget"
+import { postJson } from "@/lib/secure-fetch"
 import Link from "next/link"
 
 function LoginForm() {
@@ -19,6 +21,9 @@ function LoginForm() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [shouldRedirect, setShouldRedirect] = useState(false)
+  // CAPTCHA de proveedor (Cloudflare Turnstile): token del widget + contador para reiniciarlo
+  const [turnstileToken, setTurnstileToken] = useState("")
+  const [turnstileReset, setTurnstileReset] = useState(0)
   const { formRef, ready, loadError, reload, fieldNames, fieldFromName, verify, honeypotProps, captcha } = useHumanCheck("login", ["email", "password"] as const)
 
   useEffect(() => {
@@ -38,8 +43,21 @@ function LoginForm() {
     setError("")
     if (!formData.email.trim()) { setError("Por favor ingresa tu email"); return }
     if (!formData.password) { setError("Por favor ingresa tu contraseña"); return }
+    if (!turnstileToken) { setError("Completa la verificación de seguridad"); return }
 
     setIsLoading(true)
+
+    // 1) Verificamos el token de Turnstile en el servidor (contra Cloudflare)
+    const { res, data } = await postJson("/api/turnstile/verify", { token: turnstileToken })
+    if (!res.ok || !data.ok) {
+      setError(data.error || "No se pudo verificar que eres humano")
+      setTurnstileToken("")
+      setTurnstileReset((n) => n + 1) // el token es de un solo uso: pedimos uno nuevo
+      setIsLoading(false)
+      return
+    }
+
+    // 2) Verificación propia por riesgo (honeypot, señales, CAPTCHA si escala)
     const check = await verify(e)
     if (!check.ok) { setError(check.error); setIsLoading(false); return }
 
@@ -48,6 +66,8 @@ function LoginForm() {
       setShouldRedirect(true)
     } else {
       setError(result.error || "Error al iniciar sesión")
+      setTurnstileToken("")
+      setTurnstileReset((n) => n + 1)
       setIsLoading(false)
     }
   }
@@ -101,9 +121,14 @@ function LoginForm() {
             </div>
             <Honeypot {...honeypotProps} />
             <CaptchaWidget {...captcha} />
+            <TurnstileWidget
+              onToken={setTurnstileToken}
+              onExpire={() => setTurnstileToken("")}
+              resetSignal={turnstileReset}
+            />
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
               className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {isLoading ? "Cargando..." : "Ingresar"}
