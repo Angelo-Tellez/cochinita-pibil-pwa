@@ -36,6 +36,25 @@ export async function POST(request: Request) {
         // Extraemos el cuerpo de la petición de forma segura
         const body = await request.json().catch(() => ({}))
 
+                const signals = body.signals ?? {}
+
+        // Campos de control obligatorios
+        if (typeof body.captchaPass !== 'string' || typeof body.formToken !== 'string') {
+            console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"missing_control_fields"}`)
+            return NextResponse.json({ ok: false, error: "Solicitud inválida." }, { status: 400 })
+        }
+
+        // Honeypot: un humano nunca llena este campo
+        if (signals.honeypot && String(signals.honeypot).trim() !== "") {
+            console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"honeypot_filled"}`)
+            return NextResponse.json({ ok: false, error: "Solicitud rechazada." }, { status: 403 })
+        }
+
+        // Navegador automatizado (Selenium/Puppeteer)
+        if (signals.webdriver === true) {
+            console.log(`[bot-audit] {"ts":"${new Date().toISOString()}","route":"/api/verify-human","ip":"${clientIp}","reason":"webdriver_detected"}`)
+            return NextResponse.json({ ok: false, error: "Solicitud rechazada." }, { status: 403 })
+        }
         // Buscamos la respuesta en todos lados (por si el hook la anidó)
         const rawAnswer = body.securityQuestion ?? body.fields?.securityQuestion ?? body.data?.securityQuestion
 
