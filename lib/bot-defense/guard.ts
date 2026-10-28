@@ -48,7 +48,8 @@ export async function protect(
   let rlHeaders: Record<string, string> = {}
   const respond = (body: object, status = 200, extraHeaders: Record<string, string> = {}) => {
     const res = NextResponse.json(body, { status, headers: { "Cache-Control": "no-store", ...rlHeaders, ...extraHeaders } })
-    if (session.isNew) setSessionCookie(res, session.id)
+    // Se reenvía siempre para renovar su expiración mientras el usuario siga activo
+    setSessionCookie(res, session.id)
     return res
   }
 

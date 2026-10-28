@@ -8,7 +8,8 @@ import { randomId, safeEqual, sign } from "./keys"
 // dominio puede hacer que el navegador envíe la cookie, pero no puede leer el token.
 
 export const SESSION_COOKIE = "bd_sid"
-const SESSION_MAX_AGE = 60 * 60 // 1 hora
+// La cookie se renueva en cada respuesta (ventana deslizante): sólo expira tras 8 h sin actividad
+const SESSION_MAX_AGE = 8 * 60 * 60 // 8 horas
 const CSRF_TTL_MS = SESSION_MAX_AGE * 1000
 
 export function getClientIp(req: NextRequest) {

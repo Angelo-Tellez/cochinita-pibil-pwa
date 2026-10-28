@@ -28,7 +28,7 @@ export const FORM_POLICIES: Record<string, FormPolicy> = {
   contact: { captcha: "always", challengeTypes: ["checkbox"], acceptedPasses: ["checkbox", ...STRONG], fields: ["name", "email", "subject", "message"] },
 }
 
-const FORM_TTL_MS = 30 * 60_000
+const FORM_TTL_MS = 2 * 60 * 60_000 // 2 horas con el formulario abierto
 
 interface SealedForm {
   k: "form"
