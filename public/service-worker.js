@@ -16,7 +16,9 @@ messaging.onBackgroundMessage((payload) => {
   //console.log("Notificación recibida:", payload)
 })
 
-const CACHE_NAME = "cochinita-pibil-v2"
+// v3: se sube la versión para que al activar se borre la caché vieja (v2), que podía
+// tener respuestas de /api/session con un token CSRF caducado (ver handler de fetch).
+const CACHE_NAME = "cochinita-pibil-v3"
 const urlsToCache = ["/"]
 
 self.addEventListener("install", (event) => {
@@ -41,6 +43,12 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return
+
+  // Las rutas /api/ (sesión, token CSRF, captcha, etc.) NUNCA se cachean: deben ir
+  // siempre a la red. Cachearlas entregaba un token CSRF viejo y rompía el login.
+  const url = new URL(event.request.url)
+  if (url.pathname.startsWith("/api/")) return
+
   event.respondWith(
     caches.match(event.request).then((response) => {
       if (response) return response
