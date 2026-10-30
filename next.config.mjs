@@ -27,11 +27,11 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://res.cloudinary.com https://*.googleapis.com https://www.gstatic.com https://*.paypal.com https://www.paypalobjects.com https://www.google.com",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.cloudinary.com https://*.paypal.com https://www.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com",
+      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://apis.google.com https://accounts.google.com https://api.cloudinary.com https://*.paypal.com https://www.google.com https://va.vercel-scripts.com https://vitals.vercel-insights.com",
       "frame-src 'self' https://www.google.com https://*.paypal.com https://*.firebaseapp.com https://accounts.google.com https://apis.google.com",
       "object-src 'none'",
       "base-uri 'self'",
-      "form-action 'self'",
+      "form-action 'self' https://*.firebaseapp.com https://accounts.google.com",
       "frame-ancestors 'none'",
       "upgrade-insecure-requests",
     ].join('; ')
